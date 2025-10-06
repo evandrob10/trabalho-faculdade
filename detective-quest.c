@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define HASH_SIZE 10
+
 typedef struct Sala {
     char nome[50];
     char pista[100];
@@ -15,28 +17,28 @@ typedef struct BSTPista {
     struct BSTPista* direita;
 } BSTPista;
 
+typedef struct HashItem {
+    char pista[100];
+    char suspeito[50];
+    struct HashItem* proximo;
+} HashItem;
+
+// Funções básicas de sala
 Sala* criarSala(const char* nome, const char* pista) {
     Sala* novaSala = (Sala*)malloc(sizeof(Sala));
-    if (!novaSala) {
-        printf("Erro ao alocar memória!\n");
-        exit(1);
-    }
     strcpy(novaSala->nome, nome);
-    if (pista != NULL)
-        strcpy(novaSala->pista, pista);
-    else
-        strcpy(novaSala->pista, "");
+    strcpy(novaSala->pista, pista);
     novaSala->esquerda = NULL;
     novaSala->direita = NULL;
     return novaSala;
 }
 
+// Funções básicas da BST
 BSTPista* inserirPista(BSTPista* raiz, const char* pista) {
-    if (raiz == NULL) {
+    if (!raiz) {
         BSTPista* novo = (BSTPista*)malloc(sizeof(BSTPista));
         strcpy(novo->pista, pista);
-        novo->esquerda = NULL;
-        novo->direita = NULL;
+        novo->esquerda = novo->direita = NULL;
         return novo;
     }
     if (strcmp(pista, raiz->pista) < 0)
@@ -47,16 +49,43 @@ BSTPista* inserirPista(BSTPista* raiz, const char* pista) {
 }
 
 void exibirPistas(BSTPista* raiz) {
-    if (raiz == NULL)
-        return;
+    if (!raiz) return;
     exibirPistas(raiz->esquerda);
     printf("- %s\n", raiz->pista);
     exibirPistas(raiz->direita);
 }
 
-void explorarSalasComPistas(Sala* salaAtual, BSTPista** arvorePistas) {
+// Funções de hash
+unsigned int hash(const char* str) {
+    unsigned int h = 0;
+    for (int i = 0; str[i]; i++) h = (h * 31 + str[i]) % HASH_SIZE;
+    return h;
+}
+
+void inserirNaHash(HashItem* tabela[], const char* pista, const char* suspeito) {
+    unsigned int idx = hash(pista);
+    HashItem* novo = (HashItem*)malloc(sizeof(HashItem));
+    strcpy(novo->pista, pista);
+    strcpy(novo->suspeito, suspeito);
+    novo->proximo = tabela[idx];
+    tabela[idx] = novo;
+}
+
+char* encontrarSuspeito(HashItem* tabela[], const char* pista) {
+    unsigned int idx = hash(pista);
+    HashItem* item = tabela[idx];
+    while (item) {
+        if (strcmp(item->pista, pista) == 0)
+            return item->suspeito;
+        item = item->proximo;
+    }
+    return NULL;
+}
+
+// Exploração interativa
+void explorarSalas(Sala* salaAtual, BSTPista** arvorePistas, HashItem* tabela[]) {
     char escolha;
-    while (salaAtual != NULL) {
+    while (salaAtual) {
         printf("\nVocê está na %s.\n", salaAtual->nome);
         if (strlen(salaAtual->pista) > 0) {
             printf("Você encontrou uma pista: %s\n", salaAtual->pista);
@@ -66,52 +95,85 @@ void explorarSalasComPistas(Sala* salaAtual, BSTPista** arvorePistas) {
         scanf(" %c", &escolha);
 
         if (escolha == 'e' || escolha == 'E') {
-            if (salaAtual->esquerda != NULL)
-                salaAtual = salaAtual->esquerda;
-            else
-                printf("Não há sala à esquerda!\n");
+            if (salaAtual->esquerda) salaAtual = salaAtual->esquerda;
+            else printf("Não há sala à esquerda!\n");
         } else if (escolha == 'd' || escolha == 'D') {
-            if (salaAtual->direita != NULL)
-                salaAtual = salaAtual->direita;
-            else
-                printf("Não há sala à direita!\n");
+            if (salaAtual->direita) salaAtual = salaAtual->direita;
+            else printf("Não há sala à direita!\n");
         } else if (escolha == 's' || escolha == 'S') {
             printf("Exploração encerrada.\n");
             return;
         } else {
-            printf("Opção inválida! Tente novamente.\n");
+            printf("Opção inválida!\n");
         }
     }
 }
 
+// Função de julgamento final
+void verificarSuspeitoFinal(BSTPista* arvorePistas, HashItem* tabela[], const char* acusado) {
+    int contador = 0;
+    void contar(BSTPista* raiz) {
+        if (!raiz) return;
+        contar(raiz->esquerda);
+        char* suspeito = encontrarSuspeito(tabela, raiz->pista);
+        if (suspeito && strcmp(suspeito, acusado) == 0)
+            contador++;
+        contar(raiz->direita);
+    }
+    contar(arvorePistas);
+
+    printf("\n%s foi acusado.\n", acusado);
+    if (contador >= 2)
+        printf("Acusação válida! Há pistas suficientes.\n");
+    else
+        printf("Acusação inválida! Pistas insuficientes.\n");
+}
+
 int main() {
-    Sala* hallEntrada = criarSala("Hall de Entrada", "Carta misteriosa");
-    Sala* salaEstar = criarSala("Sala de Estar", "Chave antiga");
+    Sala* hall = criarSala("Hall de Entrada", "Carta misteriosa");
+    Sala* estar = criarSala("Sala de Estar", "Chave antiga");
     Sala* cozinha = criarSala("Cozinha", "Pegada suja");
     Sala* biblioteca = criarSala("Biblioteca", "Livro com anotações");
-    Sala* jardim = criarSala("Jardim", NULL);
+    Sala* jardim = criarSala("Jardim", "");
     Sala* sotao = criarSala("Sótão", "Diário secreto");
 
-    hallEntrada->esquerda = salaEstar;
-    hallEntrada->direita = cozinha;
-    salaEstar->esquerda = biblioteca;
-    salaEstar->direita = jardim;
+    hall->esquerda = estar;
+    hall->direita = cozinha;
+    estar->esquerda = biblioteca;
+    estar->direita = jardim;
     cozinha->direita = sotao;
 
     BSTPista* arvorePistas = NULL;
+    HashItem* tabela[HASH_SIZE] = {NULL};
+
+    inserirNaHash(tabela, "Carta misteriosa", "Sr. Silva");
+    inserirNaHash(tabela, "Chave antiga", "Sra. Oliveira");
+    inserirNaHash(tabela, "Pegada suja", "Sr. Silva");
+    inserirNaHash(tabela, "Livro com anotações", "Sra. Oliveira");
+    inserirNaHash(tabela, "Diário secreto", "Sr. Souza");
 
     printf("Bem-vindo ao Detective Quest!\nExplore a mansão e colete pistas.\n");
-    explorarSalasComPistas(hallEntrada, &arvorePistas);
+    explorarSalas(hall, &arvorePistas, tabela);
 
     printf("\nPistas coletadas em ordem alfabética:\n");
     exibirPistas(arvorePistas);
 
-    free(sotao);
-    free(jardim);
-    free(biblioteca);
-    free(cozinha);
-    free(salaEstar);
-    free(hallEntrada);
+    char acusado[50];
+    printf("\nQuem você acusa como culpado? ");
+    scanf(" %[^\n]", acusado);
+
+    verificarSuspeitoFinal(arvorePistas, tabela, acusado);
+
+    free(sotao); free(jardim); free(biblioteca); free(cozinha); free(estar); free(hall);
+
+    for (int i = 0; i < HASH_SIZE; i++) {
+        HashItem* item = tabela[i];
+        while (item) {
+            HashItem* tmp = item;
+            item = item->proximo;
+            free(tmp);
+        }
+    }
 
     void liberarBST(BSTPista* raiz) {
         if (!raiz) return;
