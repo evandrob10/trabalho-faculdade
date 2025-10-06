@@ -53,9 +53,8 @@ void exibirEstado(Fila *f, Pilha *p) {
         printf("[%c %d] ", f->fila[indice].tipo, f->fila[indice].id);
     }
     printf("\nPilha de reserva (Topo -> Base):\n");
-    if(p->topo == -1) {
-        printf("Vazia");
-    } else {
+    if(p->topo == -1) printf("Vazia");
+    else {
         for(int i = p->topo; i >= 0; i--) {
             printf("[%c %d] ", p->pilha[i].tipo, p->pilha[i].id);
         }
@@ -100,6 +99,31 @@ void usarPecaReserva(Pilha *p) {
     p->topo--;
 }
 
+void trocarPeças(Fila *f, Pilha *p) {
+    if(f->qtd == 0 || p->topo == -1) {
+        printf("Não é possível trocar: fila ou pilha vazia.\n");
+        return;
+    }
+    Peca temp = f->fila[f->frente];
+    f->fila[f->frente] = p->pilha[p->topo];
+    p->pilha[p->topo] = temp;
+    printf("Troca realizada entre frente da fila e topo da pilha.\n");
+}
+
+void trocaMultipla(Fila *f, Pilha *p) {
+    if(f->qtd < 3 || p->topo < 2) {
+        printf("Não há peças suficientes para troca múltipla.\n");
+        return;
+    }
+    for(int i = 0; i < 3; i++) {
+        int idxFila = (f->frente + i) % TAMANHO_FILA;
+        Peca temp = f->fila[idxFila];
+        f->fila[idxFila] = p->pilha[p->topo - i];
+        p->pilha[p->topo - i] = temp;
+    }
+    printf("Troca múltipla realizada entre as 3 primeiras da fila e as 3 da pilha.\n");
+}
+
 int main() {
     srand(time(NULL));
     Fila fila;
@@ -112,31 +136,25 @@ int main() {
 
     do {
         exibirEstado(&fila, &pilha);
-        printf("\nOpções de Ação:\n");
-        printf("1 - Jogar peça\n");
-        printf("2 - Reservar peça\n");
-        printf("3 - Usar peça reservada\n");
+        printf("\nOpções disponíveis:\n");
+        printf("1 - Jogar peça da frente da fila\n");
+        printf("2 - Enviar peça da fila para a pilha de reserva\n");
+        printf("3 - Usar peça da pilha de reserva\n");
+        printf("4 - Trocar peça da frente da fila com topo da pilha\n");
+        printf("5 - Trocar os 3 primeiros da fila com 3 da pilha\n");
         printf("0 - Sair\n");
-        printf("Opção: ");
+        printf("Opção escolhida: ");
         scanf("%d", &opcao);
 
         switch(opcao) {
-            case 1:
-                jogarPeca(&fila, &proximoId);
-                break;
-            case 2:
-                reservarPeca(&fila, &pilha, &proximoId);
-                break;
-            case 3:
-                usarPecaReserva(&pilha);
-                break;
-            case 0:
-                printf("Saindo do programa...\n");
-                break;
-            default:
-                printf("Opção inválida! Tente novamente.\n");
+            case 1: jogarPeca(&fila, &proximoId); break;
+            case 2: reservarPeca(&fila, &pilha, &proximoId); break;
+            case 3: usarPecaReserva(&pilha); break;
+            case 4: trocarPeças(&fila, &pilha); break;
+            case 5: trocaMultipla(&fila, &pilha); break;
+            case 0: printf("Saindo do programa...\n"); break;
+            default: printf("Opção inválida! Tente novamente.\n");
         }
-
     } while(opcao != 0);
 
     return 0;
